@@ -22,7 +22,7 @@ var (
 		"http://localhost:4200",
 	}
 	corsOptions = []handlers.CORSOption{
-		handlers.AllowedMethods([]string{"GET", "HEAD", "POST"}),
+		handlers.AllowedMethods([]string{http.MethodGet, http.MethodHead, http.MethodPost}),
 		handlers.AllowedHeaders([]string{"Content-Type", "Authorization", "Accept", "Accept-Language", "Origin"}),
 		handlers.AllowCredentials(),
 		handlers.AllowedOriginValidator(allowedOriginValidator),
@@ -54,19 +54,17 @@ func allowedOriginValidator(origin string) bool {
 	return passCORS
 }
 
-type capabilities struct {
-	GitServiceEnabled, GitLabEnabled, GitHubEnabled bool
-}
-
 func addRoutes() {
 
-	routes.HandleFunc("/api/version", version).Methods("GET")
-	routes.HandleFunc("/api/workspaces", getWorkspaces).Methods("GET")
-	routes.HandleFunc("/api/projects", getProjects).Methods("GET")
-	routes.HandleFunc("/api/project/{projectID}", getProject).Methods("GET")
-	routes.HandleFunc("/api/project/delete", deleteProject).Methods("POST")
-	routes.HandleFunc("/api/project/create", createProject).Methods("POST")
-	routes.HandleFunc("/api/message", getMessageWebSocket).Methods("GET")
+	routes.HandleFunc("/api/version", version).Methods(http.MethodGet)
+	routes.HandleFunc("/api/workspaces", getWorkspaces).Methods(http.MethodGet)
+	routes.HandleFunc("/api/projects", getProjects).Methods(http.MethodGet)
+	routes.HandleFunc("/api/project/{projectID}", getProject).Methods(http.MethodGet)
+	routes.HandleFunc("/api/project/model/{projectID}", getModel).Methods(http.MethodGet)
+	routes.HandleFunc("/api/project/delete", deleteProject).Methods(http.MethodPost)
+	routes.HandleFunc("/api/project/create", createProject).Methods(http.MethodPost)
+	routes.HandleFunc("/api/project/updatemodel", updateThreatModel).Methods(http.MethodPost)
+	routes.HandleFunc("/api/message", getMessageWebSocket).Methods(http.MethodGet)
 
 }
 
@@ -81,6 +79,23 @@ func getWorkspaces(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(wss)
+}
+
+func updateThreatModel(w http.ResponseWriter, r *http.Request) {
+	var model projects.Message
+	if err := json.NewDecoder(r.Body).Decode(&model); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	m, err := updateTM(model)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(m)
 }
 
 func createProject(w http.ResponseWriter, r *http.Request) {
@@ -119,6 +134,19 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(project)
+}
+
+func getModel(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	projID := vars["projectID"]
+	m, err := pm.GetModel(projID)
+	m.Type = "update_ui"
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(m)
 }
 
 func deleteProject(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +188,7 @@ func getMessageWebSocket(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//ServeAPI serves the zero trust modeller service on the specified port
+// ServeAPI serves the zero trust modeller service on the specified port
 func ServeAPI(config Config) {
 	hostPort := "localhost:%d"
 	if !config.Local {

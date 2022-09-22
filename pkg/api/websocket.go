@@ -36,7 +36,7 @@ func addLongLivedSocket(ctx context.Context, msg projects.Message, ws *websocket
 	go readLoop(ctx, ws)
 }
 
-//websocket read loop
+// websocket read loop
 func readLoop(_ context.Context, ws *websocket.Conn) {
 	for {
 		var msg projects.Message
@@ -57,13 +57,13 @@ func processMessage(msg projects.Message, ws *websocket.Conn) {
 	case "process_model":
 		processModel(msg, ws)
 	case "get_model":
-		getModel(msg, ws)
+		getModelOverWS(msg, ws)
 	default:
 		log.Printf("Unhandles message type: %s", msg.Type)
 	}
 }
 
-func getModel(msg projects.Message, ws *websocket.Conn) {
+func getModelOverWS(msg projects.Message, ws *websocket.Conn) {
 	m, _ := pm.GetModel(msg.ProjectID)
 	m.Type = "update_ui"
 	ws.WriteJSON(m)
@@ -138,7 +138,7 @@ func (c *webSocketDiagnosticConsumer) start(id string) {
 
 }
 
-//Stop streaming diagnostics - noop
+// Stop streaming diagnostics - noop
 func (c *webSocketDiagnosticConsumer) ReceiveDiagnostic() {
 
 }
